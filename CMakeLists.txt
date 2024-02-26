@@ -27,6 +27,8 @@ FetchContent_MakeAvailable(cpprealm ftxui)
 
 add_executable(local_todo
         main.cpp
+        scroller.hpp
+        scroller.cpp
 )
 
 target_link_libraries(local_todo PRIVATE cpprealm)

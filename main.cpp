@@ -14,6 +14,7 @@
 #include "ftxui/screen/color_info.hpp"  // for ColorInfo
 #include "ftxui/screen/screen.hpp"      // for Size, Dimensions
 #include "ftxui/screen/terminal.hpp"    // for Size, Dimensions
+#include "scroller.hpp"
 
 using namespace ftxui;
 
@@ -31,7 +32,7 @@ namespace realm {
 
 void createItem(std::string summary, bool isComplete, realm::db database);
 ftxui::Component makeItemRow(realm::managed<realm::Item> item, realm::db database);
-//void deleteItem(realm::Item itemToDelete, realm::db database);
+void deleteItem(std::string itemSummary, realm::db database);
 
 int main() {
     auto screen = ftxui::ScreenInteractive::FitComponent();
@@ -89,24 +90,70 @@ int main() {
 
     int taskSelected = 0;
 
-    auto renderTasks = [&] {
-        Elements task;
+    auto renderTasks = Renderer([&] {
+        Elements tasks;
         for (int i = 0; i < items.size(); i++) {
             std::string completionString = (items[i].isComplete) ? " Complete " : " Incomplete ";
-            std::string mineOrNot = (items[i].owner_id == "me") ? " Mine " : " Theirs ";
-            auto content = hbox({
+            std::string mineOrNot = (items[i].owner_id == "me") ? " Mine " : " Them ";
+            auto taskRow = hbox({
                                         text(items[i].summary) | flex,
                                         align_right(text(completionString)),
                                         align_right(text(mineOrNot))
             }) | size(WIDTH, GREATER_THAN, 80);
-            task.push_back(content);
+            tasks.push_back(taskRow);
         }
-        return task;
-    };
+        auto content = vbox(std::move(tasks));
+        return content;
+    });
+
+    auto scroller = Scroller(renderTasks);
+
+    scroller = Renderer(scroller, [scroller] {
+        return vbox({
+                            text("Content"),
+                            separator(),
+                            scroller->Render() | flex,
+                    });
+    });
+
+    auto scrollerContainer = scroller;
+    scrollerContainer =
+            Renderer(scrollerContainer, [scrollerContainer] { return scrollerContainer->Render() | flex; });
+
+    scrollerContainer = CatchEvent(scrollerContainer, [&](Event event) {
+        //refresh_commit_list();
+
+//        if (event == Event::Character('d')) {
+//            //deleteItem()
+//
+//            return true;
+//        }
+//
+//        if (event == Event::Character('c')) {
+//            //decrease_hunk();
+//            return true;
+//        }
+
+        if (event == Event::Character('q') || event == Event::Escape) {
+            screen.ExitLoopClosure()();
+            return true;
+        }
+
+        return false;
+    });
 
     // Lay out and render dashboard
     auto dashboardLayout = Container::Vertical({
-        newTaskLayout
+        scroller, newTaskLayout
+    });
+
+    auto newTaskRenderer = Renderer(newTaskLayout, [&] {
+        auto content = hbox({
+                     inputNewTaskSummary->Render() | flex,
+                     newTaskCompletionStatus->Render() | center,
+                     saveButton->Render(),
+             }) | size(WIDTH, GREATER_THAN, 80) | center;
+        return window(text(L" Add a new task "), content);
     });
 
     auto mainRenderer = Renderer(dashboardLayout, [&] {
@@ -114,7 +161,8 @@ int main() {
                 vbox({
                     taskTableHeaderRow,
                     separator(),
-                    vflow(renderTasks()),
+//                    vflow(renderTasks()),
+//                    screen.Loop(scroller),
                     separator(),
                     hbox({
                         inputNewTaskSummary->Render() | flex,
@@ -125,8 +173,18 @@ int main() {
         return window(text(L" Todo Tracker "), content);
     });
 
+//    auto combinedWindowRenderer = Renderer(dashboardLayout, [&] {
+//        auto content = vbox({
+//            //scroller,
+//            newTaskRenderer,
+//        });
+//           return window(text(L" Todo Tracker "), content)
+//    });
+
     try {
-        screen.Loop(mainRenderer);
+        //screen.Loop(mainRenderer);
+        //screen.Loop(newTaskRenderer);
+        screen.Loop(scroller);
     } catch(...) {
         std::cout << "The app crashed with an error." << std::endl;
     }
@@ -146,11 +204,17 @@ void createItem(std::string summary, bool isComplete, realm::db database)
     });
 };
 
-//void deleteItem(realm::managed<realm::Item> itemToDelete, realm::db database) {
-//    database.write( [&itemToDelete, &database]{
-//        database.remove(itemToDelete);
-//    });
-//};
+void deleteItem(std::string itemSummary, realm::db database) {
+    auto items = database.objects<realm::Item>();
+    auto itemsWithMatchingSummary = items.where(
+            [itemSummary](auto &item) { return item.summary == itemSummary; });
+    if (itemsWithMatchingSummary.size() > 0) {
+        auto matchingItem = itemsWithMatchingSummary[0];
+        database.write( [&matchingItem, &database]{
+            database.remove(matchingItem);
+        });
+    }
+};
 
 ftxui::Component makeItemRow(realm::managed<realm::Item> item, realm::db database) {
     std::string completionString = (item.isComplete) ? " Complete " : " Incomplete ";
