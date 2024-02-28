@@ -119,7 +119,7 @@ int main() {
 //        }
 
         if (event == Event::Character('q') || event == Event::Escape) {
-            screen.ExitLoopClosure();
+            screen.ExitLoopClosure()();
             return true;
         }
 
@@ -134,7 +134,7 @@ int main() {
                                              });
 
     auto dashboardLayout = Container::Vertical({
-        scroller, newTaskLayout
+        scrollerContainer, newTaskLayout
     });
 
     auto mainRenderer = Renderer(dashboardLayout, [&] {
@@ -155,6 +155,7 @@ int main() {
 
     try {
         screen.Loop(mainRenderer);
+        //screen.Loop(scroller);
     } catch(...) {
         std::cout << "The app crashed with an error." << std::endl;
     }
