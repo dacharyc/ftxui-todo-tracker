@@ -1,6 +1,8 @@
 #ifndef SCROLLER_H
 #define SCROLLER_H
 
+#pragma once
+
 #include <ftxui/component/component.hpp>
 
 #include "ftxui/component/component_base.hpp"  // for Component

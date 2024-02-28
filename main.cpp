@@ -32,7 +32,8 @@ namespace realm {
 
 void createItem(std::string summary, bool isComplete, realm::db database);
 ftxui::Component makeItemRow(realm::managed<realm::Item> item, realm::db database);
-void deleteItem(std::string itemSummary, realm::db database);
+void deleteItem(realm::managed<realm::Item> itemToDelete, realm::db database);
+void markComplete(realm::managed<realm::Item> itemToMarkComplete, realm::db database);
 
 int main() {
     auto screen = ftxui::ScreenInteractive::FitComponent();
@@ -74,8 +75,6 @@ int main() {
     });
 
     // Lay out and render scrollable task list
-    int taskSelected = 0;
-
     auto renderTasks = Renderer([&] {
         Elements tasks;
         for (int i = 0; i < items.size(); i++) {
@@ -105,16 +104,18 @@ int main() {
             Renderer(scrollerContainer, [scrollerContainer] { return scrollerContainer->Render() | flex; });
 
     scrollerContainer = CatchEvent(scrollerContainer, [&](Event event) {
-        //refresh_commit_list();
+        if (event == Event::Character('d')) {
+            // Get index of selected item in the scroller
+//            auto scrollerIndex = scroller.getScrollerIndex();
+//            auto managedItemAtIndex = items[scrollerIndex];
+//            deleteItem(managedItemAtIndex, database);
+            return true;
+        }
 
-//        if (event == Event::Character('d')) {
-//            //deleteItem()
-//
-//            return true;
-//        }
-//
 //        if (event == Event::Character('c')) {
-//            //decrease_hunk();
+//            auto scrollerIndex = scroller.getScrollerIndex();
+//            auto managedItemAtIndex = items[scrollerIndex];
+//            markComplete(managedItemAtIndex, database);
 //            return true;
 //        }
 
@@ -175,14 +176,14 @@ void createItem(std::string summary, bool isComplete, realm::db database)
     });
 };
 
-void deleteItem(std::string itemSummary, realm::db database) {
-    auto items = database.objects<realm::Item>();
-    auto itemsWithMatchingSummary = items.where(
-            [itemSummary](auto &item) { return item.summary == itemSummary; });
-    if (itemsWithMatchingSummary.size() > 0) {
-        auto matchingItem = itemsWithMatchingSummary[0];
-        database.write( [&matchingItem, &database]{
-            database.remove(matchingItem);
-        });
-    }
+void deleteItem(realm::managed<realm::Item> itemToDelete, realm::db database) {
+    database.write( [&itemToDelete, &database]{
+        database.remove(itemToDelete);
+    });
+};
+
+void markComplete(realm::managed<realm::Item> itemToMarkComplete, realm::db database) {
+    database.write( [&itemToMarkComplete, &database]{
+        itemToMarkComplete.isComplete = true;
+    });
 };
