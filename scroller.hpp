@@ -1,17 +1,29 @@
 #ifndef SCROLLER_H
 #define SCROLLER_H
 
-#pragma once
-
 #include <ftxui/component/component.hpp>
-
 #include "ftxui/component/component_base.hpp"  // for Component
 
-namespace ftxui {
-    Component Scroller(Component child);
-}
+class ScrollerBase: public ftxui::ComponentBase {
+    public:
+        ScrollerBase(ftxui::Component child);
+
+        int getScrollerIndex() const;
+        ftxui::Element Render() final;
+
+    private:
+        int indexOfSelectedItem = 0;
+
+        bool OnEvent(ftxui::Event event) final;
+
+        bool Focusable() const final;
+
+        int size_ = 0;
+        ftxui::Box box_;
+    };
+
+    std::shared_ptr<ScrollerBase> Scroller(ftxui::Component child);
+
 #endif /* end of include guard: SCROLLER_H */
 
-// Copyright 2021 Arthur Sonzogni. All rights reserved.
-// Use of this source code is governed by the MIT license that can be found in
-// the LICENSE file.
+// Based on Arthur Sonzogni/git-tui (MIT License)

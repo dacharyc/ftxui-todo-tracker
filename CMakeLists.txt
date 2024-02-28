@@ -32,8 +32,4 @@ add_executable(local_todo
 )
 
 target_link_libraries(local_todo PRIVATE cpprealm)
-target_link_libraries(local_todo 
-  PRIVATE ftxui::screen
-  PRIVATE ftxui::dom
-  PRIVATE ftxui::component
-)
+target_link_libraries(local_todo PRIVATE ftxui::component)

@@ -2,18 +2,10 @@
 #include <string>
 
 #include "ftxui/component/component.hpp"  // for Checkbox, Renderer, Horizontal, Vertical, Input, Menu, Radiobox, ResizableSplitLeft, Tab
-#include "ftxui/component/component_base.hpp"  // for ComponentBase, Component
-#include "ftxui/component/component_options.hpp"  // for MenuOption, InputOption
 #include "ftxui/component/event.hpp"              // for Event, Event::Custom
 #include "ftxui/component/screen_interactive.hpp"  // for Component, ScreenInteractive
 #include "ftxui/dom/elements.hpp"  // for text, color, operator|, bgcolor, filler, Element, vbox, size, hbox, separator, flex, window, graph, EQUAL, paragraph, WIDTH, hcenter, Elements, bold, vscroll_indicator, HEIGHT, flexbox, hflow, border, frame, flex_grow, gauge, paragraphAlignCenter, paragraphAlignJustify, paragraphAlignLeft, paragraphAlignRight, dim, spinner, LESS_THAN, center, yframe, GREATER_THAN
-#include "ftxui/dom/flexbox_config.hpp"  // for FlexboxConfig
-#include "ftxui/dom/node.hpp"
-#include "ftxui/dom/table.hpp"
-#include "ftxui/screen/color.hpp"  // for Color, Color::BlueLight, Color::RedLight, Color::Black, Color::Blue, Color::Cyan, Color::CyanLight, Color::GrayDark, Color::GrayLight, Color::Green, Color::GreenLight, Color::Magenta, Color::MagentaLight, Color::Red, Color::White, Color::Yellow, Color::YellowLight, Color::Default, Color::Palette256, ftxui
-#include "ftxui/screen/color_info.hpp"  // for ColorInfo
-#include "ftxui/screen/screen.hpp"      // for Size, Dimensions
-#include "ftxui/screen/terminal.hpp"    // for Size, Dimensions
+
 #include "scroller.hpp"
 
 using namespace ftxui;
@@ -49,31 +41,6 @@ int main() {
     auto database = realm::db(std::move(config));
     auto items = database.objects<realm::Item>();
 
-    // Add a new Item
-    std::string newTaskSummary = "";
-    auto inputNewTaskSummary =
-            Input(&newTaskSummary, "Enter new task summary");
-
-    auto newTaskIsComplete = false;
-    auto newTaskCompletionStatus = Checkbox(" Complete ", &newTaskIsComplete);
-
-    std::string saveButtonLabel = " Save ";
-    auto saveButton = Button(&saveButtonLabel, [&]{
-            createItem(newTaskSummary, newTaskIsComplete, database);
-    });
-
-    auto newTaskLayout = Container::Horizontal(
-            {inputNewTaskSummary, newTaskCompletionStatus, saveButton});
-
-    auto newTaskRenderer = Renderer(newTaskLayout, [&] {
-        auto content = hbox({
-                                    inputNewTaskSummary->Render() | flex,
-                                    newTaskCompletionStatus->Render() | center,
-                                    saveButton->Render(),
-                            }) | size(WIDTH, GREATER_THAN, 80) | center;
-        return window(text(L" Add a new task "), content);
-    });
-
     // Lay out and render scrollable task list
     auto renderTasks = Renderer([&] {
         Elements tasks;
@@ -93,32 +60,38 @@ int main() {
 
     auto scroller = Scroller(renderTasks);
 
-    scroller = Renderer(scroller, [scroller] {
+    auto scrollerRenderer = Renderer(scroller, [scroller] {
         return vbox({
                             scroller->Render() | flex,
                     });
     });
 
-    auto scrollerContainer = scroller;
+    auto scrollerContainer = scrollerRenderer;
     scrollerContainer =
             Renderer(scrollerContainer, [scrollerContainer] { return scrollerContainer->Render() | flex; });
 
+    // Handle keyboard events.
     scrollerContainer = CatchEvent(scrollerContainer, [&](Event event) {
+        // Delete items from the database
         if (event == Event::Character('d')) {
             // Get index of selected item in the scroller
-//            auto scrollerIndex = scroller.getScrollerIndex();
-//            auto managedItemAtIndex = items[scrollerIndex];
-//            deleteItem(managedItemAtIndex, database);
+            auto scrollerIndex = scroller->getScrollerIndex();
+            // Get the matching managed Item from the Results set
+            auto managedItemAtIndex = items[scrollerIndex];
+            // Delete the item from the database
+            deleteItem(managedItemAtIndex, database);
             return true;
         }
 
-//        if (event == Event::Character('c')) {
-//            auto scrollerIndex = scroller.getScrollerIndex();
-//            auto managedItemAtIndex = items[scrollerIndex];
-//            markComplete(managedItemAtIndex, database);
-//            return true;
-//        }
+        // Mark items complete
+        if (event == Event::Character('c')) {
+            auto scrollerIndex = scroller->getScrollerIndex();
+            auto managedItemAtIndex = items[scrollerIndex];
+            markComplete(managedItemAtIndex, database);
+            return true;
+        }
 
+        // Press 'q' to quit the app
         if (event == Event::Character('q') || event == Event::Escape) {
             screen.ExitLoopClosure()();
             return true;
@@ -127,7 +100,32 @@ int main() {
         return false;
     });
 
-    // Lay out and render dashboard
+    // Lay out and render the elements to add a new item
+    std::string newTaskSummary = "";
+    auto inputNewTaskSummary =
+            Input(&newTaskSummary, "Enter new task summary");
+
+    auto newTaskIsComplete = false;
+    auto newTaskCompletionStatus = Checkbox(" Complete ", &newTaskIsComplete);
+
+    std::string saveButtonLabel = " Save ";
+    auto saveButton = Button(&saveButtonLabel, [&]{
+        createItem(newTaskSummary, newTaskIsComplete, database);
+    });
+
+    auto newTaskLayout = Container::Horizontal(
+            {inputNewTaskSummary, newTaskCompletionStatus, saveButton});
+
+    auto newTaskRenderer = Renderer(newTaskLayout, [&] {
+        auto content = hbox({
+                                    inputNewTaskSummary->Render() | flex,
+                                    newTaskCompletionStatus->Render() | center,
+                                    saveButton->Render(),
+                            }) | size(WIDTH, GREATER_THAN, 80) | center;
+        return window(text(L" Add a new task "), content);
+    });
+
+    // Lay out and render the dashboard
     ftxui::Element taskTableHeaderRow = hbox({
                                                      text(L" Summary ") | flex | bold,
                                                      align_right(text(L" Status ")),
@@ -145,6 +143,8 @@ int main() {
                     separator(),
                     scrollerContainer->Render(),
                     separator(),
+                    text("In the list, press 'c' to mark the selected item complete, 'd' to delete, 'q' to quit"),
+                    separator(),
                     hbox({
                         inputNewTaskSummary->Render() | flex,
                         newTaskCompletionStatus->Render() | center,
@@ -154,12 +154,7 @@ int main() {
         return window(text(L" Todo Tracker "), content);
     });
 
-    try {
-        screen.Loop(mainRenderer);
-        //screen.Loop(scroller);
-    } catch(...) {
-        std::cout << "The app crashed with an error." << std::endl;
-    }
+    screen.Loop(mainRenderer);
     return 0;
 }
 
@@ -168,6 +163,9 @@ void createItem(std::string summary, bool isComplete, realm::db database)
     auto item = realm::Item{
         .isComplete = isComplete,
         .summary = summary,
+        // In the Device Sync version of this task tracker, items in the list could
+        // belong to the list owner *or* someone else. In this local version, there
+        // is only "me".
         .owner_id = "me"
     };
 
@@ -176,13 +174,15 @@ void createItem(std::string summary, bool isComplete, realm::db database)
     });
 };
 
-void deleteItem(realm::managed<realm::Item> itemToDelete, realm::db database) {
+void deleteItem(realm::managed<realm::Item> itemToDelete, realm::db database)
+{
     database.write( [&itemToDelete, &database]{
         database.remove(itemToDelete);
     });
 };
 
-void markComplete(realm::managed<realm::Item> itemToMarkComplete, realm::db database) {
+void markComplete(realm::managed<realm::Item> itemToMarkComplete, realm::db database)
+{
     database.write( [&itemToMarkComplete, &database]{
         itemToMarkComplete.isComplete = true;
     });
