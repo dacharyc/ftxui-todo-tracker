@@ -111,6 +111,7 @@ int main() {
     std::string saveButtonLabel = " Save ";
     auto saveButton = Button(&saveButtonLabel, [&]{
         createItem(newTaskSummary, newTaskIsComplete, database);
+        newTaskSummary = "";
     });
 
     auto newTaskLayout = Container::Horizontal(
